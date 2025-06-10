@@ -1,0 +1,18 @@
+selenium==4.15.2
+webdriver-manager==4.0.1
+pandas==2.0.3
+requests==2.31.0
+brevo-python==1.0.0
+python-dotenv==1.0.0
+
+# Server-specific dependencies
+gunicorn==21.2.0
+psutil==5.9.6
+
+# For proxy functionality
+PySocks==1.7.1
+
+# General utilities
+pathlib2==2.3.7
+setuptools==69.0.0
+wheel==0.42.0 
