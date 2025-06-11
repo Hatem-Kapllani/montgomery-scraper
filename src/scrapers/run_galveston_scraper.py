@@ -6,18 +6,35 @@ import logging
 import argparse
 import traceback
 from pathlib import Path
+from datetime import datetime
 
-# Set up logging
+# Create log directory if it doesn't exist
+Path("logs").mkdir(exist_ok=True)
+
+# Set up enhanced logging with timestamp in filename
+current_time = datetime.now().strftime("%Y%m%d_%H%M%S")
+log_file = f"logs/galveston_run.log"
+
+# Configure root logger to capture logs from all modules
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    format='%(asctime)s - pid:%(process)d - %(threadName)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
         logging.StreamHandler(),
-        logging.FileHandler("logs/galveston_run.log", mode='a')
+        logging.FileHandler(log_file, mode='a', encoding='utf-8')
     ]
 )
 
+# Configure our specific logger
 logger = logging.getLogger("galveston_runner")
+
+# Make sure logs from selenium, requests, and other libraries are captured at WARNING level
+for module_name in ['selenium', 'urllib3', 'requests', 'WDM']:
+    logging.getLogger(module_name).setLevel(logging.WARNING)
+
+# Log start of script execution
+logger.info(f"=============== STARTING GALVESTON SCRAPER ===============")
+logger.info(f"Logging to: {os.path.abspath(log_file)}")
 
 def check_venv():
     """Check if running in a virtual environment"""
@@ -121,14 +138,32 @@ def run_scraper(num_threads=3):
     else:  # Unix/macOS
         python_path = os.path.join("scrape_delinquent_tax", "bin", "python")
     
-    # Build command arguments for the Galveston scraper
-    cmd = [python_path, "src/scrapers/galveston_multithreaded_scraper.py"]
+    # Build command arguments for the Galveston scraper with thread count
+    cmd = [python_path, "src/scrapers/galveston_multithreaded_scraper.py", "--threads", str(num_threads)]
     
     try:
         logger.info(f"Running command: {' '.join(cmd)}")
-        subprocess.run(cmd, check=True)
-        logger.info("Galveston scraper completed successfully")
-    except subprocess.CalledProcessError as e:
+        
+        # Open the log file in append mode for subprocess output
+        with open(log_file, 'a', encoding='utf-8') as log_output:
+            # Run the process and redirect stdout and stderr to the log file
+            process = subprocess.Popen(
+                cmd,
+                stdout=log_output,
+                stderr=log_output,
+                universal_newlines=True,
+                bufsize=1  # Line buffered
+            )
+            
+            # Wait for the process to complete
+            exit_code = process.wait()
+            
+            if exit_code != 0:
+                logger.error(f"Galveston scraper failed with exit code: {exit_code}")
+                sys.exit(1)
+            else:
+                logger.info("Galveston scraper completed successfully")
+    except Exception as e:
         logger.error(f"Galveston scraper failed: {str(e)}")
         sys.exit(1)
 
@@ -199,6 +234,7 @@ def main():
             raise scraper_error
     
     logger.info("Galveston tax scraper process completed")
+    logger.info(f"=============== SCRAPER EXECUTION COMPLETE ===============")
 
 if __name__ == "__main__":
     main() 

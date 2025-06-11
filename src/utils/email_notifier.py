@@ -120,29 +120,56 @@ class EmailNotifier:
             return False
     
     def send_completion_notification(self, total_records: int, patterns_completed: int, 
-                                   execution_time: str) -> bool:
+                                   execution_time: str, patterns_failed: int = 0, patterns_no_results: int = 0) -> bool:
         """Send completion notification"""
         if not self.api_instance:
             return False
             
         try:
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC")
+            total_patterns_processed = patterns_completed + patterns_failed
+            patterns_with_records = patterns_completed - patterns_no_results
+            
+            # Determine if completion was fully successful or partial
+            status_emoji = "✅" if patterns_failed == 0 else "⚠️"
+            status_text = "Completed Successfully" if patterns_failed == 0 else "Completed with Some Failures"
             
             html_content = f"""
             <html>
             <body>
-                <h2>✅ Galveston Scraper Completed Successfully</h2>
+                <h2>{status_emoji} Galveston Scraper {status_text}</h2>
                 <p><strong>Completion Time:</strong> {timestamp}</p>
                 <p><strong>Total Records Scraped:</strong> {total_records:,}</p>
                 <p><strong>Search Patterns Completed:</strong> {patterns_completed:,}</p>
+                <p><strong>&nbsp;&nbsp;• Patterns with Records:</strong> {patterns_with_records:,}</p>
+                <p><strong>&nbsp;&nbsp;• Patterns with No Results:</strong> {patterns_no_results:,}</p>
+                <p><strong>Search Patterns Failed:</strong> {patterns_failed:,}</p>
+                <p><strong>Total Patterns Processed:</strong> {total_patterns_processed:,}</p>
                 <p><strong>Total Execution Time:</strong> {execution_time}</p>
+            """
+            
+            if patterns_failed > 0:
+                success_rate = (patterns_completed / total_patterns_processed) * 100 if total_patterns_processed > 0 else 0
+                html_content += f"""
+                <div style="background-color: #fff3cd; padding: 10px; border-left: 4px solid #ffc107; margin: 10px 0;">
+                    <strong>Success Rate:</strong> {success_rate:.1f}%<br>
+                    <strong>Note:</strong> {patterns_failed} search patterns failed after maximum retry attempts. 
+                    These patterns will be skipped and can be manually reviewed if needed.
+                </div>
+                """
+            
+            html_content += """
                 <hr>
-                <p><em>The Galveston Tax Scraper has completed successfully.</em></p>
+                <p><em>The Galveston Tax Scraper has completed processing.</em></p>
             </body>
             </html>
             """
             
-            subject = f"✅ Galveston Scraper Completed - {total_records:,} records"
+            subject_suffix = f"{total_records:,} records"
+            if patterns_failed > 0:
+                subject_suffix += f", {patterns_failed} patterns failed"
+            
+            subject = f"{status_emoji} Galveston Scraper Completed - {subject_suffix}"
             sender = {"name": self.sender_name, "email": self.sender_email}
             to = [{"email": self.recipient_email, "name": self.recipient_name}]
             
@@ -178,7 +205,7 @@ def send_error_notification(error_message: str, error_details: Optional[str] = N
     return notifier.send_error_notification(error_message, error_details, context)
 
 def send_completion_notification(total_records: int, patterns_completed: int, 
-                               execution_time: str) -> bool:
+                               execution_time: str, patterns_failed: int = 0, patterns_no_results: int = 0) -> bool:
     """Convenience function to send completion notification"""
     notifier = get_email_notifier()
-    return notifier.send_completion_notification(total_records, patterns_completed, execution_time) 
+    return notifier.send_completion_notification(total_records, patterns_completed, execution_time, patterns_failed, patterns_no_results) 

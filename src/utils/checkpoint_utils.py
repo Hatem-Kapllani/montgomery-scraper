@@ -52,8 +52,15 @@ def load_latest_checkpoint():
             logger.info("No Galveston checkpoint files found")
             return {}, None
         
+        # Verify files actually exist (not just path objects)
+        existing_files = [f for f in checkpoint_files if f.exists() and f.is_file() and f.stat().st_size > 0]
+        
+        if not existing_files:
+            logger.info("No valid Galveston checkpoint files found")
+            return {}, None
+            
         # Sort by modification time and get the latest
-        latest_checkpoint = max(checkpoint_files, key=lambda x: x.stat().st_mtime)
+        latest_checkpoint = max(existing_files, key=lambda x: x.stat().st_mtime)
         
         logger.info(f"Loading checkpoint: {latest_checkpoint}")
         
