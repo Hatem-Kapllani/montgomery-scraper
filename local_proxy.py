@@ -1,14 +1,21 @@
 import base64
 import logging
 import os
+import socket
 import socketserver
 import threading
 import shutil
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from socket import socket
 from typing import Tuple, Dict, Optional, Type, Any
 from urllib.parse import urlparse
 import time
+
+# Try importing python-dotenv to load .env file
+try:
+    from dotenv import load_dotenv
+    load_dotenv()  # Load .env file if it exists
+except ImportError:
+    print("Warning: python-dotenv not available. Environment variables must be set manually.")
 
 # Try importing requests, provide helpful error if missing
 try:
@@ -35,7 +42,7 @@ class UpstreamProxyRequestHandler(BaseHTTPRequestHandler):
     server: "ThreadedHTTPServerWithConfig"
 
     # --- Overrides ---
-    def __init__(self, request: socket, client_address: Tuple[str, int], server: "ThreadedHTTPServerWithConfig"):
+    def __init__(self, request: socket.socket, client_address: Tuple[str, int], server: "ThreadedHTTPServerWithConfig"):
         """Initialize the handler with request, client address, and server."""
         super().__init__(request, client_address, server)
 
@@ -241,7 +248,7 @@ class UpstreamProxyRequestHandler(BaseHTTPRequestHandler):
         upstream_socket = None
         try:
             # Connect to the upstream proxy
-            upstream_socket = socket()
+            upstream_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             upstream_socket.settimeout(60)  # Set timeout to avoid hanging
             try:
                 upstream_socket.connect((self.server.upstream_host, self.server.upstream_port))
@@ -546,6 +553,14 @@ class LocalProxyRunner:
         self.local_port = local_port
         self.server = None
         self.server_thread = None
+
+        # Ensure we have the latest environment variables by reloading .env
+        try:
+            from dotenv import load_dotenv
+            load_dotenv(override=True)  # override=True ensures we get fresh values
+            log.debug("Reloaded .env file to ensure fresh environment variables")
+        except ImportError:
+            log.debug("python-dotenv not available, using system environment variables")
 
         # --- Read upstream config from environment variables ---
         log.debug("Reading upstream proxy configuration from environment variables...")
